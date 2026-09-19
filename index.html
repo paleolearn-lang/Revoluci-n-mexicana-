@@ -487,22 +487,52 @@ function refreshOnlineControls(){
   }
 async function pollRoom(){
   if(!onlineMode || !roomCode) return;
+
   const fetched = await fetchRoom();
   if(!fetched) return;
-  if((fetched.revision||0) !== localRevision){
-    if(!fetched.started){
-      room = fetched; localRoomUpdatedAt = fetched.updatedAt; localRevision = fetched.revision||0;
-      renderLobby();
-    } else {
-      const wasInGame = document.getElementById('screen-game').classList.contains('active');
-      adoptRoom(fetched);
-      if(!wasInGame){
-        showScreen('screen-game');
-        document.getElementById('game-room-banner').style.display='flex';
-        document.getElementById('game-code').textContent = roomCode;
-        renderBoard();
-        renderPlayers(); renderTokens(); updateOwnershipMarks();
-        startPresence();
+
+  if((fetched.revision || 0) === localRevision) return;
+
+  if(!fetched.started){
+    room = fetched;
+    localRoomUpdatedAt = fetched.updatedAt;
+    localRevision = fetched.revision || 0;
+    renderLobby();
+    return;
+  }
+
+  const wasInGame =
+    document.getElementById('screen-game').classList.contains('active');
+
+  adoptRoom(fetched);
+
+  if(!wasInGame){
+    showScreen('screen-game');
+    document.getElementById('game-room-banner').style.display = 'flex';
+    document.getElementById('game-code').textContent = roomCode;
+    renderBoard();
+  }
+
+  renderPlayers();
+  renderTokens();
+  updateOwnershipMarks();
+  refreshLog();
+
+  // ESTO ES LO IMPORTANTE
+  updateControls();
+  refreshOnlineControls();
+
+  if(game.lastDie1 && game.lastDie2){
+    const d1el = document.getElementById('die1');
+    const d2el = document.getElementById('die2');
+
+    if(d1el && d2el){
+      setDieFace(d1el, game.lastDie1);
+      setDieFace(d2el, game.lastDie2);
+    }
+  }
+
+  startPresence();
       }
     }
   }
