@@ -169,7 +169,7 @@
 
   <div class="screen active" id="screen-mode">
     <div class="panel">
-      <h2>¿Cómo querés jugar?</h2>
+      <h2>¿Cómo quieres jugar?</h2>
       <div class="mode-choice">
         <div class="mode-card" id="mode-local"><span class="emoji">📱</span><div><div class="mtitle">Mismo dispositivo</div><div class="msub">Todos se turnan en este celular.</div></div></div>
         <div class="mode-card" id="mode-create"><span class="emoji">🏛️</span><div><div class="mtitle">Crear una sala en línea</div><div class="msub">Generá un código y compartilo con tus rivales.</div></div></div>
@@ -180,7 +180,7 @@
 
   <div class="screen" id="screen-local">
     <div class="panel">
-      <h2>Elegí las facciones en juego (2 a 5)</h2>
+      <h2>Elige las facciones en juego (2 a 5)</h2>
       <div class="nation-list" id="nation-list-local"></div>
       <button class="btn gold block" id="start-local-btn">Comenzar partida</button>
       <p class="hint">Cada facción arranca con $1800. Tocá una vez para sumarla como <strong>Humano</strong>, tocá de nuevo para pasarla a <strong>IA</strong> (juega sola), y una tercera vez para sacarla.</p>
@@ -190,7 +190,7 @@
   <div class="screen" id="screen-create">
     <div class="panel">
       <h2>Sala creada</h2>
-      <p>Compartí este código con quienes van a jugar. Todos deben abrir este mismo enlace y elegir "Unirme a una sala".</p>
+      <p>Comparte este código con quienes van a jugar. Todos deben abrir este mismo enlace y elegir "Unirme a una sala".</p>
       <div class="code-box" id="created-code">----</div>
       <button class="btn gold block" id="goto-lobby-btn">Continuar a la sala de espera</button>
     </div>
@@ -208,7 +208,7 @@
   <div class="screen" id="screen-lobby">
     <div class="panel">
       <div class="room-banner">Código de sala: <span class="code" id="lobby-code">----</span></div>
-      <h2>Elegí tu facción</h2>
+      <h2>Elige tu facción</h2>
       <div class="nation-list" id="nation-list-lobby"></div>
       <button class="btn gold block" id="start-online-btn">Iniciar partida</button>
       <p class="hint">Se necesitan al menos 2 facciones tomadas. Cualquier jugador de la sala puede iniciar la partida.</p>
@@ -228,7 +228,7 @@
     <div id="players-panel"></div>
   </div>
 
-  <footer>Un tablero ficticio de fines educativos e históricos.</footer>
+  <footer>Un tablero de fines educativos e históricos.</footer>
 </div>
 
 <div class="modal-overlay" id="modal-overlay"><div class="modal" id="modal-box"></div></div>
@@ -292,7 +292,7 @@ const GROUP_ICON = {VILLA:'rifle', ZAPATA:'wheat', CARRANZA:'book', MADERO:'star
 /* ================= DATA ================= */
 const NATIONS = [
   {id:'VILLA', name:'División del Norte (Villa)', flag:'🐎', color:'var(--villa)'},
-  {id:'ZAPATA', name:'Ejército del Sur (Zapata)', flag:'🌾', color:'var(--zapata)'},
+  {id:'ZAPATA', name:'Ejército liberador del Sur (Zapata)', flag:'🌾', color:'var(--zapata)'},
   {id:'CARRANZA', name:'Constitucionalistas (Carranza)', flag:'📜', color:'var(--carranza)'},
   {id:'MADERO', name:'Maderismo', flag:'🕊️', color:'var(--madero)'},
   {id:'FEDERAL', name:'Federales (Porfiriato/Huerta)', flag:'🦅', color:'var(--federal)'},
