@@ -445,35 +445,6 @@ async function verifyFresh(){
   }
   return true;
 }
-
-async function pollRoom(){
-  if(!onlineMode || !roomCode) return;
-  const fetched = await fetchRoom();
-  if(!fetched) return;
-  if((fetched.revision||0) !== localRevision){
-    if(!fetched.started){
-      room = fetched; localRoomUpdatedAt = fetched.updatedAt; localRevision = fetched.revision||0;
-      renderLobby();
-    } else {
-      const wasInGame = document.getElementById('screen-game').classList.contains('active');
-      adoptRoom(fetched);
-      if(!wasInGame){
-        showScreen('screen-game');
-        document.getElementById('game-room-banner').style.display='flex';
-        document.getElementById('game-code').textContent = roomCode;
-        renderBoard();
-        renderPlayers(); renderTokens(); updateOwnershipMarks();
-        startPresence();
-      }
-    }
-  }
-}
-function isMyTurn(){
-  if(!onlineMode) return true;
-  const cp = currentPlayer();
-  if(!cp) return false;
-  return room.seats[cp.id] === deviceId;
-}
 function refreshOnlineControls(){
   const waitEl = document.getElementById('wait-msg');
   if(!onlineMode){ waitEl.style.display='none'; return; }
@@ -513,7 +484,36 @@ function refreshOnlineControls(){
     buildBtn.style.display = canBuildAnywhere(p) ? 'inline-block' : 'none';
     endTurnBtn.style.display='none';
   }
+  }
+async function pollRoom(){
+  if(!onlineMode || !roomCode) return;
+  const fetched = await fetchRoom();
+  if(!fetched) return;
+  if((fetched.revision||0) !== localRevision){
+    if(!fetched.started){
+      room = fetched; localRoomUpdatedAt = fetched.updatedAt; localRevision = fetched.revision||0;
+      renderLobby();
+    } else {
+      const wasInGame = document.getElementById('screen-game').classList.contains('active');
+      adoptRoom(fetched);
+      if(!wasInGame){
+        showScreen('screen-game');
+        document.getElementById('game-room-banner').style.display='flex';
+        document.getElementById('game-code').textContent = roomCode;
+        renderBoard();
+        renderPlayers(); renderTokens(); updateOwnershipMarks();
+        startPresence();
+      }
+    }
+  }
 }
+function isMyTurn(){
+  if(!onlineMode) return true;
+  const cp = currentPlayer();
+  if(!cp) return false;
+  return room.seats[cp.id] === deviceId;
+}
+
 
 /* ================= PRESENCIA / ABANDONO ================= */
 /* La presencia se guarda en su propia ruta de Firebase (rooms/{code}/presence/{deviceId}),
@@ -765,7 +765,12 @@ function buildGame(nationIds, aiMap){
         isAI: aiMap[id]==='ai' };
     }),
     currentIndex:0, log:[], diplomaciaDeck: shuffle(DIPLOMACIA.map((c,i)=>i)), revueltaDeck: shuffle(REVUELTA.map((c,i)=>i)),
-    over:false, lastDiceSum:7, rolling:false, lastDie1:1, lastDie2:1, phase:'roll',
+over:false,
+lastDiceSum:7,
+rolling:false,
+lastDie1:1,
+lastDie2:1,
+phase:'roll',
   };
 }
 /* Solo se puede actuar si el juego existe, no terminó, no está animando los dados,
