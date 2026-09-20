@@ -534,10 +534,8 @@ async function pollRoom(){
 
   startPresence();
       }
-    }
-  }
-}
-function isMyTurn(){
+  
+    function isMyTurn(){
   if(!onlineMode) return true;
   const cp = currentPlayer();
   if(!cp) return false;
