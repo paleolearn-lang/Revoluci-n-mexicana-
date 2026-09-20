@@ -221,9 +221,10 @@
     <div id="wait-msg" style="display:none;"></div>
     <div id="controls">
       <button class="btn" id="roll-btn">Tirar los dados</button>
-      <button class="btn secondary" id="buy-btn" style="display:none;">Tomar territorio</button>
-      <button class="btn secondary" id="build-btn" style="display:none;">Construir trinchera</button>
-      <button class="btn secondary" id="end-turn-btn" style="display:none;">Terminar turno</button>
+<button class="btn secondary" id="buy-btn" style="display:none;">Tomar territorio</button>
+<button class="btn secondary" id="build-btn" style="display:none;">Construir trinchera</button>
+<button class="btn secondary" id="trade-btn" style="display:none;">🤝 Negociar / vender</button>
+<button class="btn secondary" id="end-turn-btn" style="display:none;">Terminar turno</button>
     </div>
     <div id="players-panel"></div>
   </div>
@@ -338,7 +339,7 @@ const BOARD = [
   {id:36, type:'card', deck:'levantamiento', name:'Levantamiento Popular', icon:'scroll'},
   {id:37, type:'property', name:'Guanajuato', group:'FEDERAL', price:280, rent:[24,120,360,850,1025,1200]},
   {id:38, type:'tax', name:'Deuda con el Banco Nacional de México', amount:100, icon:'coin'},
-  {id:39, type:'property', name:'Ciudad de México', group:'FEDERAL', price:350, rent:[35,175,500,1100,1300,1500]},
+  {id:39, type:'property', name:'Ciudad de México', group:'FEDERAL', price:450, rent:[35,175,500,1100,1300,1500]},
 ];
 
 const GROUP_BAND = {VILLA:'var(--band-villa)', ZAPATA:'var(--band-zapata)', CARRANZA:'var(--band-carranza)', MADERO:'var(--band-madero)', FEDERAL:'var(--band-federal)'};
@@ -347,7 +348,7 @@ const GROUP_SIZE = {VILLA:4,ZAPATA:4,CARRANZA:4,MADERO:4,FEDERAL:4};
 
 const DIPLOMACIA = [
   {text:"Pacto de la Embajada: Huerta traiciona a Madero. Retrocedé 3 casillas.", fn:(p,g)=>{ movePlayer(g,p,-3,false); }},
-  {text:"La División del Norte avanza tras una victoria militar: recibís $100 del banco.", fn:(p,g)=>{ pay(g,null,p,100); }},
+  {text:"La División del Norte toma zacatecas 1914: recibes $100 del banco.", fn:(p,g)=>{ pay(g,null,p,100); }},
   {text:"La Convención de Aguascalientes fracasa: pagás $150 por la ruptura entre facciones.", fn:(p,g)=>{ pay(g,p,null,150); }},
   {text:"Expedición Punitiva de Pershing: cada rival te paga $50 por la indignación ante la invasión extranjera.", fn:(p,g)=>{ g.players.forEach(o=>{ if(o!==p && !o.bankrupt) pay(g,o,p,50);}); }},
   {text:"Plan de Guadalupe proclamado: avanzás directo a SALIDA y cobrás $200.", fn:(p,g)=>{ movePlayer(g,p,null,true,0); }},
@@ -361,9 +362,9 @@ const REVUELTA = [
   {text:"Tifo en el campamento: pagás $70 en gastos médicos.", fn:(p,g)=>{ pay(g,p,null,70); }},
   {text:"Descubrimiento de un cargamento de plata: recibís $200 del banco.", fn:(p,g)=>{ pay(g,null,p,200); }},
   {text:"Deuda impaga con el Banco Nacional de México: pagás $50.", fn:(p,g)=>{ pay(g,p,null,50); }},
-  {text:"Apoyo de un cacique local: recibís $100.", fn:(p,g)=>{ pay(g,null,p,100); }},
+  {text:"Apoyo de un cacique local: recibes $100.", fn:(p,g)=>{ pay(g,null,p,100); }},
   {text:"Sequía en el norte: avanzás directo a SALIDA (sin cobrar bonificación).", fn:(p,g)=>{ movePlayer(g,p,null,false,0); }},
-  {text:"Nuevo control ferroviario: recibís $45 por cada línea de ferrocarril que poseas.", fn:(p,g)=>{ const c=countCanals(g,p); pay(g,null,p,45*c); }},
+  {text:"Nuevo control ferroviario: recibes $45 por cada línea de ferrocarril que poseas.", fn:(p,g)=>{ const c=countCanals(g,p); pay(g,null,p,45*c); }},
 ];
 
 /* ================= ONLINE / STATE ================= */
@@ -401,7 +402,7 @@ async function pushRoom(){
   localRevision = room.revision;
   try{
     await fetch(roomPath(), {
-      method:'PUT',
+      method:'PUSH',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(room)
     });
@@ -457,7 +458,7 @@ function refreshOnlineControls(){
     const cp = currentPlayer();
     waitEl.style.display='block';
     waitEl.textContent = `Esperando el turno de ${cp.flag} ${cp.name}...`;
-    rollBtn.style.display='none'; buyBtn.style.display='none'; buildBtn.style.display='none'; endTurnBtn.style.display='none';
+    rollBtn.style.display='none'; buyBtn.style.display='none'; buildBtn.style.display='none';tradeBtn.style.display='none'; endTurnBtn.style.display='none';
     return;
   }
   // Ya es el turno de este dispositivo: hay que volver a mostrar los controles
@@ -961,23 +962,78 @@ function startAIWatcher(){ if(aiTimer) return; aiTimer = setInterval(aiTick, 900
 function stopAIWatcher(){ if(aiTimer){ clearInterval(aiTimer); aiTimer=null; } }
 
 function aiTick(){
-  if(onlineMode) return; // la IA solo juega en modo local
+  if(onlineMode) return;
   if(!game || game.over) return;
-  const p = currentPlayer();
+
+  const p=currentPlayer();
+
   if(!p || !p.isAI || p.bankrupt) return;
   if(game.rolling) return;
 
-  const overlay = document.getElementById('modal-overlay');
+  const overlay=document.getElementById('modal-overlay');
+
+  /*
+   * Si hay una oferta de la IA abierta, NO debe pulsar
+   * automáticamente el primer botón.
+   */
+  if(
+    overlay.classList.contains('show') &&
+    overlay.dataset.aiOffer==='true'
+  ){
+    return;
+  }
+
+  /*
+   * Si hay cualquier otro modal, la IA puede continuar
+   * con la primera opción como ya hacía.
+   */
   if(overlay.classList.contains('show')){
-    const btn = document.getElementById('modal-action-0');
+    const btn=document.getElementById('modal-action-0');
     if(btn) btn.click();
     return;
   }
-  if(buyBtn.style.display !== 'none'){ aiDecideBuy(p); return; }
-  if(buildBtn.style.display !== 'none' && Math.random() < 0.6){ aiDecideBuild(p); return; }
-  if(rollBtn.style.display !== 'none' && !rollBtn.disabled){ rollBtn.click(); return; }
-  if(endTurnBtn.style.display !== 'none'){ endTurnBtn.click(); return; }
-}
+
+  /*
+   * Si la IA está casi en bancarrota,
+   * intenta vender u ofrecer propiedades.
+   */
+  if(p.money<250 && p.properties.length>0){
+
+    if(aiOfferProperty(p)){
+      return;
+    }
+
+    if(aiSellProperty(p)){
+      return;
+    }
+  }
+
+  if(buyBtn.style.display!=='none'){
+    aiDecideBuy(p);
+    return;
+  }
+
+  if(
+    buildBtn.style.display!=='none' &&
+    Math.random()<0.6
+  ){
+    aiDecideBuild(p);
+    return;
+  }
+
+  if(
+    rollBtn.style.display!=='none' &&
+    !rollBtn.disabled
+  ){
+    rollBtn.click();
+    return;
+  }
+
+  if(endTurnBtn.style.display!=='none'){
+    endTurnBtn.click();
+    return;
+  }
+    }
 
 function aiDecideBuy(p){
   const pos = parseInt(buyBtn.dataset.pos);
@@ -1019,6 +1075,7 @@ const endTurnBtn = document.getElementById('end-turn-btn');
 rollBtn.addEventListener('click', doRoll);
 buyBtn.addEventListener('click', doBuy);
 buildBtn.addEventListener('click', openBuildModal);
+tradeBtn.addEventListener('click', openTradeModal);
 endTurnBtn.addEventListener('click', endTurn);
 function currentPlayer(){ return game.players[game.currentIndex]; }
 function syncIfOnline(){ if(onlineMode){ room.game = game; pushRoom(); } }
@@ -1256,6 +1313,324 @@ async function doBuy(){
   actionInFlight = false;
   afterLanding(p, pendingWasDouble);
 }
+  /* ================= NEGOCIACIÓN Y VENTA DE PROPIEDADES ================= */
+
+function getTradeableProperties(p){
+  return p.properties.filter(id=>{
+    const space = BOARD.find(b=>b.id===id);
+    if(!space) return false;
+
+    // No se puede vender/intercambiar una propiedad
+    // que tenga trincheras o cuartel.
+    if(space.type==='property' && (p.forts[id]||0)>0) return false;
+
+    return true;
+  });
+}
+
+function getHumanTradeTargets(p){
+  return game.players.filter(other=>{
+    return other!==p &&
+           !other.bankrupt &&
+           !other.isAI;
+  });
+}
+
+function openTradeModal(){
+  if(onlineMode) return;
+  if(!game || game.over || !canAct()) return;
+
+  const p = currentPlayer();
+  const properties = getTradeableProperties(p);
+
+  if(properties.length===0){
+    showModal(
+      'Sin propiedades negociables',
+      '<p>No tienes propiedades libres de construcciones para vender o intercambiar.</p>',
+      [{label:'Cerrar',action:closeModal}]
+    );
+    return;
+  }
+
+  const targets = getHumanTradeTargets(p);
+
+  let html = `
+    <p><strong>${p.flag} ${p.name}</strong></p>
+    <p>Elige qué quieres hacer:</p>
+    <div style="display:grid;gap:8px;">
+      <button class="btn gold" id="trade-sell-bank">💰 Vender al banco</button>
+      ${targets.length ? '<button class="btn secondary" id="trade-offer-player">🤝 Ofrecer a otro jugador</button>' : ''}
+    </div>
+  `;
+
+  showModal(
+    'Negociar propiedades',
+    html,
+    [{label:'Cerrar',action:closeModal}]
+  );
+
+  document.getElementById('trade-sell-bank')?.addEventListener('click',()=>{
+    openSellPropertyModal(p);
+  });
+
+  document.getElementById('trade-offer-player')?.addEventListener('click',()=>{
+    openOfferPlayerModal(p);
+  });
+}
+
+function openSellPropertyModal(p){
+  const properties = getTradeableProperties(p);
+
+  if(properties.length===0){
+    closeModal();
+    return;
+  }
+
+  const html = properties.map(id=>{
+    const space = BOARD.find(b=>b.id===id);
+    const value = Math.floor(space.price/2);
+
+    return `
+      <button class="btn secondary"
+        data-sell-property="${id}"
+        style="display:block;width:100%;margin-bottom:7px;">
+        ${space.name} — recibir $${value}
+      </button>
+    `;
+  }).join('');
+
+  showModal(
+    'Vender propiedad al banco',
+    `<p>Recibirás aproximadamente la mitad del precio de compra.</p>${html}`,
+    [{label:'Cancelar',action:closeModal}]
+  );
+
+  document.querySelectorAll('[data-sell-property]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id=parseInt(btn.dataset.sellProperty,10);
+      sellPropertyToBank(p,id);
+    });
+  });
+}
+
+function sellPropertyToBank(p,id){
+  if(!p.properties.includes(id)) return;
+
+  const space=BOARD.find(b=>b.id===id);
+  if(!space) return;
+
+  if(space.type==='property' && (p.forts[id]||0)>0){
+    showModal(
+      'No se puede vender',
+      '<p>Primero debes retirar las trincheras de esta propiedad.</p>',
+      [{label:'Cerrar',action:closeModal}]
+    );
+    return;
+  }
+
+  const value=Math.floor(space.price/2);
+
+  p.properties=p.properties.filter(x=>x!==id);
+  delete p.forts[id];
+
+  p.mortgaged=p.mortgaged.filter(x=>x!==id);
+  p.money+=value;
+
+  logMsg(
+    `${p.flag} ${p.name} vende ${space.name} al banco por $${value}.`
+  );
+
+  sndReceive();
+  closeModal();
+
+  renderPlayers();
+  renderTokens();
+  updateOwnershipMarks();
+  updateControls();
+  syncIfOnline();
+}
+
+function openOfferPlayerModal(p){
+  const targets=getHumanTradeTargets(p);
+
+  if(targets.length===0){
+    closeModal();
+    return;
+  }
+
+  const properties=getTradeableProperties(p);
+
+  let html=`
+    <p>Elige al jugador al que quieres hacer la oferta:</p>
+    <select id="trade-target"
+      style="width:100%;padding:10px;margin-bottom:10px;">
+      ${targets.map(t=>`
+        <option value="${t.id}">
+          ${t.flag} ${t.name} — $${t.money}
+        </option>
+      `).join('')}
+    </select>
+
+    <p>Propiedad que ofrecerás:</p>
+
+    <select id="trade-property"
+      style="width:100%;padding:10px;margin-bottom:10px;">
+      ${properties.map(id=>{
+        const s=BOARD.find(b=>b.id===id);
+        return `<option value="${id}">${s.name} — $${s.price}</option>`;
+      }).join('')}
+    </select>
+
+    <p>¿Cuánto dinero quieres recibir?</p>
+
+    <input id="trade-price"
+      type="number"
+      min="0"
+      value="100"
+      style="width:100%;padding:10px;margin-bottom:10px;">
+  `;
+
+  showModal(
+    'Hacer oferta',
+    html,
+    [
+      {
+        label:'Enviar oferta',
+        action:()=>{
+          const targetId=document.getElementById('trade-target').value;
+          const propertyId=parseInt(
+            document.getElementById('trade-property').value,
+            10
+          );
+          const price=Math.max(
+            0,
+            parseInt(document.getElementById('trade-price').value,10)||0
+          );
+
+          makeTradeOffer(p,targetId,propertyId,price);
+        }
+      },
+      {
+        label:'Cancelar',
+        action:closeModal
+      }
+    ]
+  );
+}
+
+function makeTradeOffer(from,targetId,propertyId,price){
+  const target=game.players.find(p=>p.id===targetId);
+  const space=BOARD.find(b=>b.id===propertyId);
+
+  if(!target || !space || !from.properties.includes(propertyId)){
+    closeModal();
+    return;
+  }
+
+  if(target.money<price){
+    showModal(
+      'Oferta imposible',
+      `<p>${target.flag} ${target.name} no tiene suficiente dinero para pagar $${price}.</p>`,
+      [{label:'Cerrar',action:closeModal}]
+    );
+    return;
+  }
+
+  if(space.type==='property' && (from.forts[propertyId]||0)>0){
+    showModal(
+      'Oferta imposible',
+      '<p>No puedes ofrecer una propiedad que tenga trincheras o cuartel.</p>',
+      [{label:'Cerrar',action:closeModal}]
+    );
+    return;
+  }
+
+  closeModal();
+
+  showModal(
+    `🤝 Oferta de ${from.flag} ${from.name}`,
+    `
+      <p>
+        <strong>${from.name}</strong> te ofrece:
+      </p>
+
+      <p style="font-size:18px;text-align:center;">
+        🏠 <strong>${space.name}</strong>
+      </p>
+
+      <p style="text-align:center;">
+        a cambio de <strong>$${price}</strong>
+      </p>
+
+      <p>
+        Tu dinero: $${target.money}
+      </p>
+    `,
+    [
+      {
+        label:'Aceptar',
+        action:()=>{
+          acceptTrade(from,target,propertyId,price);
+        }
+      },
+      {
+        label:'Rechazar',
+        action:()=>{
+          logMsg(
+            `${target.flag} ${target.name} rechaza la oferta de ${from.flag} ${from.name}.`
+          );
+          closeModal();
+          renderPlayers();
+        }
+      }
+    ]
+  );
+}
+
+function acceptTrade(from,to,propertyId,price){
+  const space=BOARD.find(b=>b.id===propertyId);
+
+  if(!space ||
+     !from.properties.includes(propertyId) ||
+     to.money<price){
+
+    closeModal();
+
+    showModal(
+      'Oferta cancelada',
+      '<p>La operación ya no puede realizarse.</p>',
+      [{label:'Cerrar',action:closeModal}]
+    );
+
+    return;
+  }
+
+  from.properties=from.properties.filter(id=>id!==propertyId);
+  to.properties.push(propertyId);
+
+  from.money+=price;
+  to.money-=price;
+
+  if(!from.forts) from.forts={};
+  if(!to.forts) to.forts={};
+
+  delete from.forts[propertyId];
+  to.forts[propertyId]=0;
+
+  logMsg(
+    `${to.flag} ${to.name} compra ${space.name} a ${from.flag} ${from.name} por $${price}.`
+  );
+
+  sndBuy();
+
+  closeModal();
+
+  renderPlayers();
+  renderTokens();
+  updateOwnershipMarks();
+  updateControls();
+  syncIfOnline();
+  }
 function canBuildAnywhere(p){
   for(const group of Object.keys(GROUP_SIZE)){
     if(ownsAllInGroup(p, group)){
